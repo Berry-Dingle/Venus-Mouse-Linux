@@ -6,6 +6,11 @@ A native Linux app for the wired **UtechSmart Venus MMO gaming mouse**
 (USB `04d9:fc55`), replacing the Windows-only utility. Set up buttons, DPI,
 lighting, macros and the five on-mouse profiles from your Linux desktop.
 
+> **Tested hardware:** wired Venus **V2** only. UtechSmart ships the same
+> Windows utility for the wired V2 and V3, and that utility supports only
+> `04d9:fc55`, so a V3 may work. **V3 is untested.** If you try one, please
+> open an issue with the output of `lsusb -d 04d9:` so we can confirm.
+
 ## Screenshots
 
 ![Buttons page: the mouse's controls with their assignments](docs/screenshots/buttons.png)
