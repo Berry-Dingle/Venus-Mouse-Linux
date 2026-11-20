@@ -17,7 +17,7 @@ license=('GPL-3.0-or-later' 'OFL-1.1')
 depends=('python>=3.11' 'python-gobject' 'gtk4>=4.10' 'libadwaita>=1.5' 'hicolor-icon-theme')
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
 # Checksum of the GitHub tag archive; refresh with updpkgsums for each new release.
-sha256sums=('1c81d09df2fdaf73f17ecc521ed9e3518b2f23bb7e3fdc05388bcabb955d44fd')
+sha256sums=('c02c150f77c57680e075782b5b5004196bc9a895f546d9aea21840766e9975cf')
 
 package() {
     cd "Venus-Mouse-Linux-$pkgver"
