@@ -107,3 +107,35 @@ def test_package_function_lays_out_the_shared_payload(tmp_path):
         assert (pkgdir / name).read_bytes() == (tmp_path / "expected" / name).read_bytes(), name
     assert (pkgdir / "usr/share/licenses/venus-mouse/LICENSE").read_bytes() == (PROJECT / "LICENSE").read_bytes()
     assert not list(pkgdir.rglob("*.py[co]")) and not list(pkgdir.rglob("__pycache__"))
+
+
+def _pkg_builder():
+    spec = importlib.util.spec_from_file_location("arch_build_pkg", ARCH_DIR / "build_pkg.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_ready_made_package_builds_in_a_fixed_neutral_folder():
+    builder = _pkg_builder()
+    assert builder.package_name() == f"venus-mouse-{_project_version()}-1-any.pkg.tar.zst"
+    assert str(builder.TOPDIR) == "/tmp/venus-mouse-archbuild"      # recorded in .BUILDINFO
+    assert builder.PACKAGER == "Berry Dingle <dzll-launcher@tutamail.com>"
+    text = (ARCH_DIR / "build_pkg.py").read_text(encoding="utf-8")
+    assert '["makepkg", "-d", "--cleanbuild", "--noconfirm"]' in text
+    for forbidden in ("sudo", "pacman -U", "-si", "--install", "/dev/"):
+        assert forbidden not in text.split('"""', 2)[2], forbidden    # code, not the docstring
+
+
+@pytest.mark.skipif(shutil.which("makepkg") is None, reason="makepkg not installed (Arch only)")
+def test_ready_made_package_is_reproducible_and_has_no_build_paths(tmp_path):
+    builder = _pkg_builder()
+    (tmp_path / "a").mkdir()
+    (tmp_path / "b").mkdir()
+    first, second = builder.build(tmp_path / "a"), builder.build(tmp_path / "b")
+    assert first.read_bytes() == second.read_bytes()
+    with tarfile.open(fileobj=io.BytesIO(subprocess.run(["zstd", "-dc", str(first)], capture_output=True,
+                                                         check=True).stdout)) as tar:
+        info = tar.extractfile(".BUILDINFO").read().decode()
+        assert "builddir = /tmp/venus-mouse-archbuild" in info and "/home/" not in info
+        assert all(m.uname == "root" and m.gname == "root" for m in tar.getmembers())

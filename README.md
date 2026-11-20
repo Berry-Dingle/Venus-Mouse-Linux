@@ -42,7 +42,7 @@ Fedora, Ubuntu 24.04+, Debian 13+ and Arch all have.
 |---|---|
 | **Fedora** (44 and later) | `sudo dnf install ./venus-mouse-0.2.0-1.noarch.rpm` |
 | **Ubuntu 24.04+ / Debian 13+** | `sudo apt install ./venus-mouse_0.2.0-1_all.deb` |
-| **Arch** | build from `packaging/arch/PKGBUILD`: `cd packaging/arch && makepkg -si` |
+| **Arch** | `sudo pacman -U venus-mouse-0.2.0-1-any.pkg.tar.zst` (or build it yourself: `cd packaging/arch && makepkg -si`) |
 | **Any distribution** | the AppImage: `chmod +x Venus_Mouse-0.2.0-x86_64.AppImage`, then run it |
 
 **After installing a package, unplug and replug the mouse once.** The package

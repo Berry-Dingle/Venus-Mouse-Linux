@@ -18,14 +18,29 @@ The PKGBUILD downloads the GitHub release tarball for tag `v<pkgver>`
 release: push the tag, bump `pkgver` (reset `pkgrel=1`), run `updpkgsums`,
 and regenerate `.SRCINFO` (`makepkg --printsrcinfo > .SRCINFO`).
 
-## Build and install (user-run, on Arch)
+## Ready-made package (for the release page)
+
+```bash
+python3 packaging/arch/build_pkg.py          # on Arch, or in an Arch container:
+distrobox enter <arch-box> -- python3 packaging/arch/build_pkg.py
+```
+
+Runs `makepkg` on the PKGBUILD (so the `v<pkgver>` tag must be pushed first)
+and writes `build/arch/venus-mouse-<pkgver>-<pkgrel>-any.pkg.tar.zst`, which
+users install with `sudo pacman -U`. Built in the fixed folder
+`/tmp/venus-mouse-archbuild` with `SOURCE_DATE_EPOCH` = the tag's commit time,
+so `.BUILDINFO` records no user name or checkout path and every build is
+byte-identical. `-d` skips makepkg's installed-dependencies check (nothing is
+compiled, so the build doesn't need them).
+
+## Build and install yourself (on Arch)
 
 ```bash
 cd packaging/arch
 makepkg -si
 ```
 
-Checked here without makepkg (not installed on the Fedora build machine):
-`bash -n`, `.SRCINFO` matches the PKGBUILD, and `package()` run on a
-GitHub-style tarball of the tracked files gives exactly the shared payload
-plus licences and README. Not yet built with makepkg or installed on Arch.
+Checked: v0.2.0 built with makepkg 7.1.0 in an Arch container (2026-11-20),
+twice, byte-identical; same payload as the deb, plus the licences in
+`/usr/share/licenses/venus-mouse/`, all files root-owned. Not yet installed
+and run on a real Arch system.
