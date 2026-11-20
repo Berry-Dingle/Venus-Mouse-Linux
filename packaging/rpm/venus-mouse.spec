@@ -9,7 +9,7 @@
 %global app_id io.github.berry_dingle.VenusMouse
 
 Name:           venus-mouse
-Version:        0.2.0
+Version:        0.2.1
 Release:        1%{?dist}
 Summary:        Configure buttons, DPI, lighting and macros for the UtechSmart Venus mouse
 # The app is GPL-3.0-or-later; the bundled Alex Brush font is OFL-1.1.
@@ -64,5 +64,8 @@ test -z "$(find %{buildroot} -name '*.py[co]' -o -name __pycache__)"
 %{_sysusersdir}/venus-mouse.conf
 
 %changelog
+* Fri Nov 20 2026 Berry Dingle <dzll-launcher@tutamail.com> - 0.2.1-1
+- Macros: loop mode changes (repeat fixed, while held, toggle) now reach the mouse
+
 * Fri Nov 20 2026 Berry Dingle <dzll-launcher@tutamail.com> - 0.2.0-1
 - First rpm: one noarch package for Fedora 44, 45 and later

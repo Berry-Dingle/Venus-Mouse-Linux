@@ -39,7 +39,7 @@ docs recommend).
 ## Install / remove (user-run)
 
 ```bash
-sudo apt install ./build/deb/venus-mouse_0.2.0-1_all.deb
+sudo apt install ./build/deb/venus-mouse_0.2.1-1_all.deb
 sudo apt remove venus-mouse
 ```
 

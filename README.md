@@ -40,10 +40,10 @@ Fedora, Ubuntu 24.04+, Debian 13+ and Arch all have.
 
 | System | Install |
 |---|---|
-| **Fedora** (44 and later) | `sudo dnf install ./venus-mouse-0.2.0-1.noarch.rpm` |
-| **Ubuntu 24.04+ / Debian 13+** | `sudo apt install ./venus-mouse_0.2.0-1_all.deb` |
-| **Arch** | `sudo pacman -U venus-mouse-0.2.0-1-any.pkg.tar.zst` (or build it yourself: `cd packaging/arch && makepkg -si`) |
-| **Any distribution** | the AppImage: `chmod +x Venus_Mouse-0.2.0-x86_64.AppImage`, then run it |
+| **Fedora** (44 and later) | `sudo dnf install ./venus-mouse-0.2.1-1.noarch.rpm` |
+| **Ubuntu 24.04+ / Debian 13+** | `sudo apt install ./venus-mouse_0.2.1-1_all.deb` |
+| **Arch** | `sudo pacman -U venus-mouse-0.2.1-1-any.pkg.tar.zst` (or build it yourself: `cd packaging/arch && makepkg -si`) |
+| **Any distribution** | the AppImage: `chmod +x Venus_Mouse-0.2.1-x86_64.AppImage`, then run it |
 
 **After installing a package, unplug and replug the mouse once.** The package
 installs a rule that lets your desktop user talk to the mouse, with no root
@@ -81,7 +81,7 @@ PYTHONPATH=src python3 -m venus_profile.gui
 (20–250 ms) is added on top of the mouse's own ~100 ms per shot. Below 20 ms
 the mouse sends only the first click (the same happens in Windows). To see
 what a fire key really sends, open the click counter: `venus-mouse
---click-counter` (AppImage: `./Venus_Mouse-0.2.0-x86_64.AppImage
+--click-counter` (AppImage: `./Venus_Mouse-0.2.1-x86_64.AppImage
 --click-counter`).
 
 ## Your files

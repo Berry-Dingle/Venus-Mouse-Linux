@@ -25,7 +25,10 @@ python3 packaging/arch/build_pkg.py          # on Arch, or in an Arch container:
 distrobox enter <arch-box> -- python3 packaging/arch/build_pkg.py
 ```
 
-Runs `makepkg` on the PKGBUILD (so the `v<pkgver>` tag must be pushed first)
+Runs `makepkg` on the PKGBUILD (so the `v<pkgver>` tag must be pushed first,
+or pass `--source` with a local copy of the tag archive:
+`git archive --format=tar --prefix=Venus-Mouse-Linux-<ver>/ v<ver> | gzip -n`
+reproduces GitHub's file byte for byte, and makepkg still checks its SHA-256)
 and writes `build/arch/venus-mouse-<pkgver>-<pkgrel>-any.pkg.tar.zst`, which
 users install with `sudo pacman -U`. Built in the fixed folder
 `/tmp/venus-mouse-archbuild` with `SOURCE_DATE_EPOCH` = the tag's commit time,

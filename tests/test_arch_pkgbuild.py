@@ -127,6 +127,15 @@ def test_ready_made_package_builds_in_a_fixed_neutral_folder():
         assert forbidden not in text.split('"""', 2)[2], forbidden    # code, not the docstring
 
 
+def test_local_source_takes_the_name_makepkg_downloads_to_and_is_still_checksummed():
+    builder = _pkg_builder()
+    source = subprocess.run(["bash", "-c", f'source "{ARCH_DIR / "PKGBUILD"}"; printf %s "${{source[0]}}"'],
+                            check=True, capture_output=True, text=True).stdout
+    assert source.split("::", 1)[0] == builder.source_name() == f"venus-mouse-{_project_version()}.tar.gz"
+    text = (ARCH_DIR / "PKGBUILD").read_text(encoding="utf-8")
+    assert "sha256sums=('" in text and "SKIP" not in text           # the local copy must match the release
+
+
 @pytest.mark.skipif(shutil.which("makepkg") is None, reason="makepkg not installed (Arch only)")
 def test_ready_made_package_is_reproducible_and_has_no_build_paths(tmp_path):
     builder = _pkg_builder()

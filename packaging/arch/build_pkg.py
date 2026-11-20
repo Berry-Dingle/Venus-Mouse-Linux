@@ -1,11 +1,14 @@
 """Build the ready-to-install Arch package (``venus-mouse-<ver>-1-any.pkg.tar.zst``).
 
-    python3 packaging/arch/build_pkg.py [--output DIR]
+    python3 packaging/arch/build_pkg.py [--output DIR] [--source TARBALL]
 
 Runs on Arch, or in an Arch container (for example ``distrobox enter <arch-box>
 -- python3 packaging/arch/build_pkg.py``). It runs ``makepkg`` on the PKGBUILD,
 which downloads the GitHub archive of tag ``v<pkgver>`` and checks its SHA-256,
-so the tag must already be pushed. The package is the one ``makepkg -si`` would
+so the tag must already be pushed. ``--source`` hands makepkg a local copy of
+that archive instead (``git archive --format=tar --prefix=Venus-Mouse-Linux-<ver>/
+v<ver> | gzip -n`` reproduces GitHub's file byte for byte); makepkg still checks
+it against the PKGBUILD's SHA-256, so only the exact release archive builds. The package is the one ``makepkg -si`` would
 build, for users who'd rather just ``sudo pacman -U`` it.
 
 Reproducible: makepkg runs in the fixed folder ``/tmp/venus-mouse-archbuild``
@@ -53,7 +56,12 @@ def tag_epoch(version: str) -> int:
     return int(out)
 
 
-def build(output: Path) -> Path:
+def source_name() -> str:
+    """File name makepkg looks for in SRCDEST (the ``name::url`` prefix of ``source``)."""
+    return f"venus-mouse-{pkgbuild_value('pkgver')}.tar.gz"
+
+
+def build(output: Path, source: Path | None = None) -> Path:
     if shutil.which("makepkg") is None:
         raise SystemExit("makepkg not found: run this on Arch or in an Arch container")
     epoch = tag_epoch(pkgbuild_value("pkgver"))
@@ -61,6 +69,8 @@ def build(output: Path) -> Path:
     TOPDIR.mkdir(parents=True)
     try:
         shutil.copyfile(PKGBUILD, TOPDIR / "PKGBUILD")
+        if source is not None:
+            shutil.copyfile(source, TOPDIR / source_name())   # makepkg verifies its SHA-256
         env = {**os.environ, "SOURCE_DATE_EPOCH": str(epoch), "PACKAGER": PACKAGER,
                "PKGEXT": ".pkg.tar.zst", "BUILDDIR": str(TOPDIR), "PKGDEST": str(TOPDIR),
                "SRCDEST": str(TOPDIR), "SRCPKGDEST": str(TOPDIR)}
@@ -79,9 +89,11 @@ def build(output: Path) -> Path:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--output", type=Path, default=PROJECT / "build/arch")
+    parser.add_argument("--source", type=Path, default=None,
+                        help="local copy of the v<pkgver> release archive (checked by makepkg)")
     args = parser.parse_args(argv)
     args.output.mkdir(parents=True, exist_ok=True)
-    pkg = build(args.output.resolve())
+    pkg = build(args.output.resolve(), args.source.resolve() if args.source else None)
     print(f"built    {pkg}  ({pkg.stat().st_size / 1e6:.1f} MB)")
     print(f"sha256   {hashlib.sha256(pkg.read_bytes()).hexdigest()}")
     return 0
