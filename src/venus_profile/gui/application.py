@@ -214,7 +214,7 @@ class VenusWindow(Adw.ApplicationWindow):
         self._live_lighting = LiveLighting(self.workspace, lighting_writer or start_lighting_write,
                                            self._lighting_write_failed, on_profile=self._mouse_profile_switched,
                                            on_result=log_mouse_write, on_applied=self._applied_to_mouse,
-                                           on_live_buttons=self.workspace.commit_buttons)
+                                           on_live_buttons=self._live_buttons_sent)
         self._close_after_lighting = False
         self._close_after_apply = False         # close overlay: Apply, then close
         self._close_after_save = False          # close overlay: Save As, then close
@@ -453,8 +453,17 @@ class VenusWindow(Adw.ApplicationWindow):
         else:
             self._applied_to_mouse()                    # nothing to send (e.g. PC-only settings): just commit
 
+    def _live_buttons_sent(self, keys) -> None:
+        """Buttons sent live (slot move or macro loop change): commit them, then refresh Apply.
+
+        A loop-only change leaves the profile file as it was, so commit_buttons
+        has nothing to notify; the Apply state must still drop the sent records.
+        """
+        self.workspace.commit_buttons(keys)
+        self._refresh_apply()
+
     def _applied_to_mouse(self) -> None:
-        self.workspace.mark_applied()                   # edited markers clear; Cancel returns here
+        self.workspace.mark_applied()                  # edited markers clear; Cancel returns here
         self._refresh_apply()
         self.toast("Applied to the mouse")
         if self._close_after_apply:
@@ -688,12 +697,13 @@ class VenusWindow(Adw.ApplicationWindow):
     # ------------------------------------------------------------ status
     def _workspace_changed(self, reason: str) -> None:
         self.refresh_status()
-        rewritten = self.workspace.take_slot_rewritten_buttons()
-        if rewritten and self._live_lighting.live:
-            self._live_lighting.push_live_buttons(rewritten)   # slot move: buttons follow live (option b)
-            if diagnostics_enabled():
-                print("venus-mouse: slot change re-points " + ", ".join(f"P{p}B{b}" for p, b in sorted(rewritten)),
-                      file=sys.stderr, flush=True)
+        for cause, rewritten in (("slot change re-points", self.workspace.take_slot_rewritten_buttons()),
+                                 ("loop change updates", self.workspace.take_loop_rewritten_buttons())):
+            if rewritten and self._live_lighting.live:
+                self._live_lighting.push_live_buttons(rewritten)   # buttons follow live (option b)
+                if diagnostics_enabled():
+                    print(f"venus-mouse: {cause} " + ", ".join(f"P{p}B{b}" for p, b in sorted(rewritten)),
+                          file=sys.stderr, flush=True)
         self._live_lighting.sync()
         if reason == "lighting":
             # Lighting is sent live, so it is committed at once (never shown as pending, never

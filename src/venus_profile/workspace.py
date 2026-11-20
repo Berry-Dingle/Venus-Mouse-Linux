@@ -92,6 +92,8 @@ class VenusWorkspace:
         #: (profile, button) re-pointed by the last slot operation (move, swap,
         #: remove); the window sends these live with the slot uploads (option b).
         self.slot_rewritten_buttons: set[tuple[int, int]] = set()
+        #: (profile, button) whose record changed with a macro loop edit; sent live too.
+        self.loop_rewritten_buttons: set[tuple[int, int]] = set()
         for slot in SLOTS:
             session = self.profiles.session_for_slot(slot)
             if session is not None:
@@ -540,8 +542,26 @@ class VenusWorkspace:
             changed += 1
         return changed
 
+    def mark_macro_loop_changed(self, macro_id: str) -> None:
+        """A macro's loop mode/count changed: its buttons' device records change.
+
+        The loop flags and count live in each button's ``91`` record (hid.exe
+        0x412F10), so the buttons pointing at the macro's device slot are queued
+        like a slot move and follow live. A macro not loaded in a slot has no
+        buttons on the mouse.
+        """
+        slot = self.library.bank.slot_of(macro_id)
+        if slot is None:
+            return
+        for reference in self.references_to_slot(slot):
+            self.loop_rewritten_buttons.add((reference.profile, reference.button))
+
     def take_slot_rewritten_buttons(self) -> set[tuple[int, int]]:
         keys, self.slot_rewritten_buttons = self.slot_rewritten_buttons, set()
+        return keys
+
+    def take_loop_rewritten_buttons(self) -> set[tuple[int, int]]:
+        keys, self.loop_rewritten_buttons = self.loop_rewritten_buttons, set()
         return keys
 
     def commit_buttons(self, keys) -> bool:

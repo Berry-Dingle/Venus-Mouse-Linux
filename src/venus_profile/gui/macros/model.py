@@ -711,6 +711,7 @@ class MacroPresentationState:
             set_loop(entry.macro, loop_type, time)
         except (KeyError, MacroLibraryError) as exc:
             raise ValueError(str(exc)) from exc
+        self.workspace.mark_macro_loop_changed(entry.macro_id)
         self._macros_edited()
 
     # ------------------------------------------------------------ bank

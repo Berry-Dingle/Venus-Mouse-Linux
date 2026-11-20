@@ -569,7 +569,8 @@ def test_fire_count_on_the_mouse_is_never_overwritten(setup):
     for i, v in enumerate(bytes.fromhex("99 81 04 01")):       # P1 button 4: left fire, 4 shots, 10 ms
         values[0x008E + i] = v
     reader.finish({"version": 1, "status": "ok", "memory": memory_ranges(values)})
-    assert window._live_lighting.wanted_buttons() == [] and not _apply_enabled(window)
+    assert window._live_lighting.wanted_buttons() == [] and window.workspace.edited_slots() == (), window.workspace.edited_slots()
+    assert not _apply_enabled(window)
 
 
 def test_unknown_button_record_on_the_mouse_is_never_written(setup):
@@ -959,6 +960,80 @@ def test_unrelated_button_edits_still_wait_for_apply(setup):
     assert _apply_enabled(window) and window.workspace.edited_slots() == (1,)
 
 
+def _edit_loop(window, entry, loop_type, loop_time=None):
+    from venus_profile.gui.macros.model import library_stable_id
+    presentation = window.pages["macros"].presentation
+    presentation.select_macro(library_stable_id(entry.macro_id))
+    presentation.edit_loop(loop_type, loop_time)
+
+
+@pytest.mark.parametrize("loop_type, loop_time, record", [
+    (3, None, "914a0100"),        # toggle: flag 0x40 | slot 10, count = LoopTime (1)
+    (1, None, "918a0100"),        # while held: flag 0x80
+    (0, 5, "910a0500"),           # fixed: count 5
+])
+def test_changing_a_macro_loop_mode_sends_its_buttons_live(setup, loop_type, loop_time, record):
+    window, reader, _watcher, writer = setup
+    _read_ok(window, reader)
+    a, _b = _two_macros_on_buttons(window, writer)
+    window.workspace.swap_slots(9, 10)                            # Mac A now in slot 11 (index 10)
+    _finish_all(writer, window)
+    calls_before = len(writer.calls)
+    _edit_loop(window, a, loop_type, loop_time)
+    _finish_all(writer, window)
+    assert [kind for kind, _ in writer.calls[calls_before:]] == ["buttons"]
+    assert writer.calls[-1][1] == ((1, 15, bytes.fromhex(record)),)
+    assert window._live_lighting.wanted_buttons() == [] and window.workspace.edited_slots() == (), window.workspace.edited_slots()
+    assert not _apply_enabled(window)
+
+
+def test_diagnostics_name_a_loop_change_and_a_slot_change(setup, capsys, monkeypatch):
+    monkeypatch.setenv("VENUS_PROFILE_DIAGNOSTICS", "1")
+    window, reader, _watcher, writer = setup
+    _read_ok(window, reader)
+    a, _b = _two_macros_on_buttons(window, writer)
+    capsys.readouterr()
+    _edit_loop(window, a, 3)
+    _finish_all(writer, window)
+    err = capsys.readouterr().err
+    assert "venus-mouse: loop change updates P1B15" in err and "slot change" not in err
+    window.workspace.swap_slots(9, 10)
+    _finish_all(writer, window)
+    err = capsys.readouterr().err
+    assert "venus-mouse: slot change re-points P1B15" in err and "loop change" not in err
+
+
+def test_loop_change_back_to_run_once_is_sent(setup):
+    window, reader, _watcher, writer = setup
+    _read_ok(window, reader)
+    a, _b = _two_macros_on_buttons(window, writer)
+    _edit_loop(window, a, 3)
+    _finish_all(writer, window)
+    _edit_loop(window, a, 2)
+    _finish_all(writer, window)
+    assert writer.calls[-1] == ("buttons", ((1, 15, bytes.fromhex("91090100")),))
+
+
+def test_loop_change_of_a_macro_not_in_a_slot_sends_nothing(setup):
+    window, reader, _watcher, writer = setup
+    _read_ok(window, reader)
+    _two_macros_on_buttons(window, writer)
+    loose = _library_macro(window, "Loose", 0x06)
+    calls_before = len(writer.calls)
+    _edit_loop(window, loose, 3)
+    _finish_all(writer, window)
+    assert writer.calls[calls_before:] == [] and window._live_lighting.wanted_buttons() == []
+
+
+def test_loop_flags_of_a_mouse_only_slot_are_left_alone(setup):
+    window, reader, _watcher, writer = setup
+    _read_ok(window, reader)
+    live = window._live_lighting
+    live._workspace.library.mouse_only[6] = bytes(200)
+    assert not live._macro_loop_differs(bytes.fromhex("91860100"), bytes.fromhex("91060100"))
+    assert not live._macro_loop_differs(bytes.fromhex("91060100"), bytes.fromhex("91070100"))  # slot change: elsewhere
+
+
 def test_before_a_read_repointed_buttons_are_ordinary_edits(setup):
     window, reader, _watcher, writer = setup
     a = _library_macro(window, "Mac A")
@@ -1091,7 +1166,8 @@ def test_fire_count_read_from_the_mouse_leaves_nothing_pending(setup):
     window, reader, _watcher, writer = setup
     _fire_read(window, reader)
     assert bf_read(window, 1, 4).fire.count == 4
-    assert window._live_lighting.wanted_buttons() == [] and not _apply_enabled(window)
+    assert window._live_lighting.wanted_buttons() == [] and window.workspace.edited_slots() == (), window.workspace.edited_slots()
+    assert not _apply_enabled(window)
 
 
 def test_changing_only_the_fire_count_waits_for_apply_and_sends_it(setup):

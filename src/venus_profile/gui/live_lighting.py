@@ -244,9 +244,22 @@ class LiveLighting:
             mouse = self._mouse_buttons.get(key)
             if mouse is None or record is None or not button_record_is_known(record):
                 continue                     # unknown on the mouse, or not derivable yet (e.g. empty macro slot)
-            if not button_records_equivalent(mouse, record) or self._fire_count_differs(key, mouse, record):
+            if not button_records_equivalent(mouse, record) or self._fire_count_differs(key, mouse, record) \
+                    or self._macro_loop_differs(mouse, record):
                 wanted.append((key[0], key[1], record))
         return wanted
+
+    def _macro_loop_differs(self, mouse: bytes, record: bytes) -> bool:
+        """A macro button on the same slot whose loop flags/count differ from the library macro's.
+
+        The loop mode lives in the button's ``91`` record (hid.exe 0x412F10), so
+        a loop edit must be sent. Slots only on the mouse keep the mouse's own
+        flags (their loop settings are unknown to the app).
+        """
+        if record[0] != 0x91 or mouse[0] != 0x91 or record == mouse:
+            return False
+        slot = record[1] & 0x3F
+        return (mouse[1] & 0x3F) == slot and self._workspace.library.slot_macro(slot) is not None
 
     def _fire_count_differs(self, key, mouse: bytes, record: bytes) -> bool:
         """A fire key whose count this profile stores must match the mouse's count too.
