@@ -1,0 +1,3 @@
+# Optional group for non-desktop access to the Venus mouse (udev rule GROUP=).
+# The logged-in desktop user already gets access through TAG+="uaccess".
+g venus-mouse -

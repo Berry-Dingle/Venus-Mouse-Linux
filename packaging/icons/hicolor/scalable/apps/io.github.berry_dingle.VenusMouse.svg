@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <title>Venus Mouse</title>
+  <!-- Neon line-art mouse in pinky-red on a fully transparent background. -->
+  <defs>
+    <g id="lines" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <!-- body -->
+      <rect x="170" y="170" width="172" height="272" rx="86"/>
+      <!-- button split and palm line -->
+      <path d="M256 170 V200"/>
+      <path d="M256 266 V284"/>
+      <path d="M170 284 H342"/>
+      <!-- scroll wheel -->
+      <rect x="238" y="200" width="36" height="66" rx="18"/>
+      <!-- cable -->
+      <path d="M256 170 C256 132 232 116 196 112 C160 108 132 98 116 70"/>
+    </g>
+    <filter id="wide" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="16"/>
+    </filter>
+    <filter id="near" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="5"/>
+    </filter>
+  </defs>
+  <!-- outer haze, inner glow, coloured tube, hot core -->
+  <g transform="translate(256 256) scale(0.98) translate(-229 -256)">
+    <use href="#lines" stroke="#ff1a47" stroke-width="26" opacity="0.65" filter="url(#wide)"/>
+    <use href="#lines" stroke="#ff2352" stroke-width="16" opacity="0.95" filter="url(#near)"/>
+    <use href="#lines" stroke="#ff2e5b" stroke-width="12"/>
+    <use href="#lines" stroke="#ffc9d6" stroke-width="4"/>
+  </g>
+</svg>

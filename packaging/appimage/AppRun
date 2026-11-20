@@ -1,0 +1,65 @@
+#!/bin/sh
+# Venus Mouse AppImage launcher (thin AppImage: uses the system's Python 3,
+# GTK 4, libadwaita and PyGObject).
+#
+#   Venus_Mouse-*.AppImage                 start the app
+#   Venus_Mouse-*.AppImage --click-counter open the fire-key click counter
+#
+# The app's device helpers are started with the same Python and inherit
+# PYTHONPATH, so they run from this AppImage too.
+
+# The AppImage runtime sets APPDIR; fall back to this script's folder (extracted AppDir).
+HERE="${APPDIR:-$(dirname "$(readlink -f "$0")")}"
+export PYTHONPATH="$HERE/usr/lib/venus-mouse${PYTHONPATH:+:$PYTHONPATH}"
+export PYTHONDONTWRITEBYTECODE=1        # the AppImage is read-only
+
+PYTHON="$(command -v python3)"
+
+missing() {
+    message="Venus Mouse needs these installed on your system:
+
+  Python 3.11 or newer, GTK 4.10+, libadwaita 1.5+ and PyGObject
+
+Fedora:        sudo dnf install python3-gobject gtk4 libadwaita
+Ubuntu/Debian: sudo apt install python3-gi gir1.2-gtk-4.0 gir1.2-adw-1
+Arch:          sudo pacman -S python-gobject gtk4 libadwaita
+
+Details: $1"
+    printf '%s\n' "$message" >&2
+    if command -v zenity >/dev/null 2>&1; then
+        zenity --error --title="Venus Mouse" --no-wrap --text="$message" 2>/dev/null
+    elif command -v kdialog >/dev/null 2>&1; then
+        kdialog --title "Venus Mouse" --error "$message" 2>/dev/null
+    elif command -v notify-send >/dev/null 2>&1; then
+        notify-send "Venus Mouse" "Missing Python 3, GTK 4, libadwaita or PyGObject (see terminal)"
+    fi
+    exit 1
+}
+
+[ -n "$PYTHON" ] || missing "python3 was not found"
+
+CHECK='
+import sys
+if sys.version_info < (3, 11):
+    sys.exit("Python %d.%d is too old" % sys.version_info[:2])
+try:
+    import gi
+    gi.require_version("Gtk", "4.0")
+    gi.require_version("Adw", "1")
+    from gi.repository import Adw, Gtk
+except (ImportError, ValueError) as exc:
+    sys.exit(str(exc))
+if (Gtk.get_major_version(), Gtk.get_minor_version()) < (4, 10):
+    sys.exit("GTK %d.%d is too old" % (Gtk.get_major_version(), Gtk.get_minor_version()))
+if (Adw.get_major_version(), Adw.get_minor_version()) < (1, 5):
+    sys.exit("libadwaita %d.%d is too old" % (Adw.get_major_version(), Adw.get_minor_version()))
+'
+problem="$("$PYTHON" -c "$CHECK" 2>&1)" || missing "$problem"
+
+case "$1" in
+    --click-counter)
+        shift
+        exec "$PYTHON" -m venus_profile.gui.click_counter "$@"
+        ;;
+esac
+exec "$PYTHON" -m venus_profile.gui "$@"

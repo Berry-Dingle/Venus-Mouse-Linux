@@ -1,0 +1,19 @@
+#!/bin/sh
+# Venus Mouse post-install: create the optional "venus-mouse" system group
+# (named by the udev rule; the desktop user already has access via uaccess)
+# and reload udev rules so the rule is known. Nobody is added to the group,
+# and no device is triggered: replug the mouse once after installing.
+set -e
+
+if [ "$1" = "configure" ]; then
+    if command -v systemd-sysusers >/dev/null 2>&1; then
+        systemd-sysusers venus-mouse.conf
+    elif ! getent group venus-mouse >/dev/null 2>&1; then
+        addgroup --system venus-mouse
+    fi
+    if command -v udevadm >/dev/null 2>&1; then
+        udevadm control --reload-rules || true
+    fi
+fi
+
+exit 0

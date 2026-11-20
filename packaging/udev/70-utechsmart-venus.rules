@@ -1,0 +1,11 @@
+# UtechSmart Venus 04d9:fc55 configuration HID only.
+# usb_id walks to the USB device and supplies ID_VENDOR_ID/ID_MODEL_ID.
+# ATTRS{bInterfaceNumber} independently selects the USB interface ancestor.
+# TAG+="uaccess" also gives the logged-in desktop user access (no group needed).
+ACTION!="add|change", GOTO="utechsmart_venus_end"
+SUBSYSTEM!="hidraw", GOTO="utechsmart_venus_end"
+
+IMPORT{builtin}="usb_id"
+ENV{ID_VENDOR_ID}=="04d9", ENV{ID_MODEL_ID}=="fc55", ATTRS{bInterfaceNumber}=="02", GROUP="venus-mouse", MODE="0660", TAG+="uaccess"
+
+LABEL="utechsmart_venus_end"

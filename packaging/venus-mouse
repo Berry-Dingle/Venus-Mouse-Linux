@@ -1,0 +1,21 @@
+#!/bin/sh
+# Venus Mouse launcher (rpm, deb and Arch packages). The app lives in /usr/share/venus-mouse and runs
+# on the system's Python 3, so the same package works whichever Python 3.11+
+# the Fedora release ships.
+#
+#   venus-mouse                  start the app
+#   venus-mouse --click-counter  open the fire-key click counter
+#
+# The app's device helpers are started with the same Python and inherit
+# PYTHONPATH, so they run from /usr/share/venus-mouse too.
+
+export PYTHONPATH="/usr/share/venus-mouse${PYTHONPATH:+:$PYTHONPATH}"
+export PYTHONDONTWRITEBYTECODE=1        # /usr/share is read-only for users
+
+case "$1" in
+    --click-counter)
+        shift
+        exec /usr/bin/python3 -m venus_profile.gui.click_counter "$@"
+        ;;
+esac
+exec /usr/bin/python3 -m venus_profile.gui "$@"

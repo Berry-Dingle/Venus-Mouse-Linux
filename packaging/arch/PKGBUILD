@@ -1,0 +1,29 @@
+# Maintainer: Berry Dingle <dzll-launcher@tutamail.com>
+#
+# Venus Mouse for Arch Linux (AUR). Architecture-independent: the app lives in
+# /usr/share/venus-mouse and runs on the system's Python 3.11+, so Arch's
+# Python updates need no rebuild. Same payload as the rpm and deb
+# (packaging/install_tree.py). pacman's systemd hooks create the
+# "venus-mouse" group from sysusers.d and reload the udev rules; replug the
+# mouse once after installing.
+
+pkgname=venus-mouse
+pkgver=0.2.0
+pkgrel=1
+pkgdesc="Configure buttons, DPI, lighting and macros for the UtechSmart Venus MMO mouse"
+arch=('any')
+url="https://github.com/Berry-Dingle/Venus-Mouse-Linux"
+license=('GPL-3.0-or-later' 'OFL-1.1')
+depends=('python>=3.11' 'python-gobject' 'gtk4>=4.10' 'libadwaita>=1.5' 'hicolor-icon-theme')
+source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
+# Replace with the release tarball's checksum once the v$pkgver tag exists (updpkgsums).
+sha256sums=('SKIP')
+
+package() {
+    cd "Venus-Mouse-Linux-$pkgver"
+    python packaging/install_tree.py "$pkgdir"
+    install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+    install -Dm644 src/venus_profile/gui/data/fonts/AlexBrush-OFL.txt \
+        "$pkgdir/usr/share/licenses/$pkgname/AlexBrush-OFL.txt"
+    install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
+}

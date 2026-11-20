@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Venus Mouse
+GenericName=Mouse Configuration
+Comment=Configure buttons, DPI, lighting and macros for the Venus MMO mouse
+Exec=venus-profile-gui
+Icon=io.github.berry_dingle.VenusMouse
+Terminal=false
+Categories=Utility;
+Keywords=mouse;MMO;macro;DPI;lighting;
+StartupNotify=true
+StartupWMClass=io.github.berry_dingle.VenusMouse

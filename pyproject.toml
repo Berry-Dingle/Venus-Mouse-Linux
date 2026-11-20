@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "venus-profile"
+version = "0.2.0"
+description = "Linux configuration utility for the UtechSmart Venus MMO mouse"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE", "src/venus_profile/gui/data/fonts/AlexBrush-OFL.txt"]
+
+[project.urls]
+Homepage = "https://github.com/Berry-Dingle/Venus-Mouse-Linux"
+Issues = "https://github.com/Berry-Dingle/Venus-Mouse-Linux/issues"
+
+[project.scripts]
+venus-profile = "venus_profile.cli:main"
+venus-profile-gui = "venus_profile.gui.application:main"
+venus-profile-read-snapshot = "venus_profile.read_snapshot:main"
+
+[tool.setuptools.package-data]
+venus_profile = ["gui/*.css", "gui/data/*.png", "gui/data/icons/hicolor/*/apps/*", "gui/data/fonts/*", "data/factory/*.pfd", "data/read_plan/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-ra"
+filterwarnings = [
+    "ignore:^GLib\\.unix_signal_add_full is deprecated.*$:gi.overrides.PyGIDeprecationWarning:^gi[.]overrides",
+    "ignore:^'asyncio\\.AbstractEventLoopPolicy' is deprecated.*$:DeprecationWarning:^gi\\.events$",
+    "ignore:^'asyncio\\.get_event_loop_policy' is deprecated.*$:DeprecationWarning:^gi\\.events$",
+]

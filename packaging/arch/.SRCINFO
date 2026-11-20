@@ -1,0 +1,17 @@
+pkgbase = venus-mouse
+	pkgdesc = Configure buttons, DPI, lighting and macros for the UtechSmart Venus MMO mouse
+	pkgver = 0.2.0
+	pkgrel = 1
+	url = https://github.com/Berry-Dingle/Venus-Mouse-Linux
+	arch = any
+	license = GPL-3.0-or-later
+	license = OFL-1.1
+	depends = python>=3.11
+	depends = python-gobject
+	depends = gtk4>=4.10
+	depends = libadwaita>=1.5
+	depends = hicolor-icon-theme
+	source = venus-mouse-0.2.0.tar.gz::https://github.com/Berry-Dingle/Venus-Mouse-Linux/archive/refs/tags/v0.2.0.tar.gz
+	sha256sums = SKIP
+
+pkgname = venus-mouse
