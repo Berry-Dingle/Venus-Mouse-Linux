@@ -14,10 +14,9 @@ after installing.
 ## Source
 
 The PKGBUILD downloads the GitHub release tarball for tag `v<pkgver>`
-(`…/archive/refs/tags/v0.2.0.tar.gz`). It therefore works only after that tag
-is pushed. Until then `sha256sums=('SKIP')`; after tagging, run `updpkgsums`
-and regenerate `.SRCINFO` (`makepkg --printsrcinfo > .SRCINFO`) before
-publishing to the AUR.
+(`…/archive/refs/tags/v0.2.0.tar.gz`) and checks its SHA-256. For each new
+release: push the tag, bump `pkgver` (reset `pkgrel=1`), run `updpkgsums`,
+and regenerate `.SRCINFO` (`makepkg --printsrcinfo > .SRCINFO`).
 
 ## Build and install (user-run, on Arch)
 

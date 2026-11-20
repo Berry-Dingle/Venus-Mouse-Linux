@@ -12,6 +12,6 @@ pkgbase = venus-mouse
 	depends = libadwaita>=1.5
 	depends = hicolor-icon-theme
 	source = venus-mouse-0.2.0.tar.gz::https://github.com/Berry-Dingle/Venus-Mouse-Linux/archive/refs/tags/v0.2.0.tar.gz
-	sha256sums = SKIP
+	sha256sums = 1c81d09df2fdaf73f17ecc521ed9e3518b2f23bb7e3fdc05388bcabb955d44fd
 
 pkgname = venus-mouse

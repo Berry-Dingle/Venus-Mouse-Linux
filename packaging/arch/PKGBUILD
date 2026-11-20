@@ -16,8 +16,8 @@ url="https://github.com/Berry-Dingle/Venus-Mouse-Linux"
 license=('GPL-3.0-or-later' 'OFL-1.1')
 depends=('python>=3.11' 'python-gobject' 'gtk4>=4.10' 'libadwaita>=1.5' 'hicolor-icon-theme')
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
-# Replace with the release tarball's checksum once the v$pkgver tag exists (updpkgsums).
-sha256sums=('SKIP')
+# Checksum of the GitHub tag archive; refresh with updpkgsums for each new release.
+sha256sums=('1c81d09df2fdaf73f17ecc521ed9e3518b2f23bb7e3fdc05388bcabb955d44fd')
 
 package() {
     cd "Venus-Mouse-Linux-$pkgver"
