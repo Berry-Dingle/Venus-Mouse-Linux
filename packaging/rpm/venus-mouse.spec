@@ -9,7 +9,7 @@
 %global app_id io.github.berry_dingle.VenusMouse
 
 Name:           venus-mouse
-Version:        0.2.2
+Version:        0.2.3
 Release:        1%{?dist}
 Summary:        Configure buttons, DPI, lighting and macros for the UtechSmart Venus mouse
 # The app is GPL-3.0-or-later; the bundled Alex Brush font is OFL-1.1.
@@ -64,6 +64,12 @@ test -z "$(find %{buildroot} -name '*.py[co]' -o -name __pycache__)"
 %{_sysusersdir}/venus-mouse.conf
 
 %changelog
+* Sat Nov 21 2026 Berry Dingle <dzll-launcher@tutamail.com> - 0.2.3-1
+- Buttons: Shift, Ctrl, Alt, Super and Tab can be assigned as keyboard keys
+- Macros: deleting a macro asks for confirmation again
+- Settings: pointer speed, acceleration and double-click speed now read and
+  change the desktop's mouse settings (KDE Plasma Wayland, GNOME) on Apply
+
 * Sat Nov 21 2026 Berry Dingle <dzll-launcher@tutamail.com> - 0.2.2-1
 - Macros: toggle loop mode now toggles (count FF FF, as the Windows utility sends)
 

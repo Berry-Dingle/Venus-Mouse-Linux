@@ -111,8 +111,11 @@ side-grid tooltips show the current assignment. The physical registry
   Windows palette and a custom colour picker or `#RRGGBB` entry stored as a
   correct COLORREF. Colour controls are disabled for Rainbow and Off.
   `FlashState1` is preserved, not exposed (no controlled evidence).
-- **Settings**: pointer speed 1–20, acceleration 1–4, scroll lines 1–63,
-  double-click speed 1–10 and polling rate 125/250/500/1000 Hz. A *Mouse
+- **Settings**: scroll lines 1–63 and polling rate 125/250/500/1000 Hz (on the
+  mouse); pointer speed 1–20, acceleration Off/On and double-click speed 1–10
+  as the desktop's mouse settings (`desktop_settings.py`: GNOME GSettings, KDE
+  KWin D-Bus + kdeglobals), mirrored at start-up and changed on Apply; rows the
+  desktop lacks are hidden. A *Mouse
   Connection* card states that device writing is disabled and opens the
   read-only *Apply Preview*.
 

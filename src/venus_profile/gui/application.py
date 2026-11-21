@@ -1129,7 +1129,7 @@ class VenusWindow(Adw.ApplicationWindow):
         about = Adw.AboutDialog(
             application_name="Venus Mouse",
             application_icon=APPLICATION_ID,
-            version="0.2.2",
+            version="0.2.3",
             comments=("Linux configuration utility for the UtechSmart Venus wired MMO mouse. "
                       "Profiles and macros are edited and saved on this computer; lighting, "
                       "the active profile and macro slots are sent to the mouse live; DPI, polling, "

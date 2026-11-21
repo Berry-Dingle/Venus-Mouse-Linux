@@ -41,9 +41,9 @@ AppDir can import the app and helpers on its own.
 ## Use
 
 ```bash
-chmod +x Venus_Mouse-0.2.2-x86_64.AppImage
-./Venus_Mouse-0.2.2-x86_64.AppImage                  # the app
-./Venus_Mouse-0.2.2-x86_64.AppImage --click-counter  # fire-key click counter
+chmod +x Venus_Mouse-0.2.3-x86_64.AppImage
+./Venus_Mouse-0.2.3-x86_64.AppImage                  # the app
+./Venus_Mouse-0.2.3-x86_64.AppImage --click-counter  # fire-key click counter
 ```
 
 Mouse access: AppImage users run the copy-paste command from
