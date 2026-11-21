@@ -213,6 +213,11 @@ class ComboSetting:
             parts.append(key_name(self.key))
         return "+".join(parts) if parts else "Empty combination"
 
+    @property
+    def lone_modifier(self) -> int | None:
+        """The modifier when this is one modifier on its own (a Shift/Ctrl/Alt/Super key)."""
+        return self.modifiers[0] if len(self.modifiers) == 1 and self.key is None else None
+
 
 @dataclass(frozen=True, slots=True)
 class ButtonAssignmentView:
@@ -249,6 +254,8 @@ class ButtonAssignmentView:
         if code == FUNCTION_COMBO_KEY:
             if self.combo is None:
                 return "Key Combination (unreadable, preserved)"
+            if self.combo.lone_modifier is not None:
+                return f"Key {key_name(self.combo.lone_modifier)}"
             return f"Combo {self.combo.label}"
         if code == FUNCTION_FIRE_KEY and self.fire is not None:
             shots = self.fire.count if self.fire.count is not None else FIRE_DEFAULT_COUNT
@@ -316,8 +323,13 @@ def decode_combo(blob: bytes, record_count: int) -> ComboSetting:
     return ComboSetting(tuple(modifiers), keys[0] if keys else None)
 
 
-def encode_combo(setting: ComboSetting) -> tuple[bytes, int]:
-    """Encode modifiers and an optional key as Windows-style triples."""
+def encode_combo(setting: ComboSetting, *, allow_lone_modifier: bool = False) -> tuple[bytes, int]:
+    """Encode modifiers and an optional key as Windows-style triples.
+
+    ``allow_lone_modifier`` permits one modifier with no key: how a bare
+    Shift/Ctrl/Alt/Super assignment is stored (device record ``8F mask 00 00``,
+    the shape of the captured modifier-only record ``8F 0A 00 00`` Shift+Win).
+    """
     if any(usage not in MODIFIER_BITS for usage in setting.modifiers):
         raise ValueError("combo modifiers must be Left Ctrl, Shift, Alt, or Super")
     if len(set(setting.modifiers)) != len(setting.modifiers):
@@ -327,7 +339,7 @@ def encode_combo(setting: ComboSetting) -> tuple[bytes, int]:
     order = list(setting.modifiers) + ([setting.key] if setting.key is not None else [])
     if not order:
         raise ValueError("a key combination needs at least one key")
-    if len(order) < 2:
+    if len(order) < 2 and not (allow_lone_modifier and setting.lone_modifier is not None):
         raise ValueError("a key combination needs at least two keys; use Single Key instead")
     records = [(usage, COMBO_RECORD_MARKER, COMBO_STATE_DOWN) for usage in order]
     records += [(usage, COMBO_RECORD_MARKER, COMBO_STATE_UP) for usage in reversed(order)]
@@ -461,8 +473,16 @@ def set_single_key(profile: PfdProfile, button: int, usage: int) -> None:
     _clear_macro_name(profile, button)
 
 
-def set_combo(profile: PfdProfile, button: int, setting: ComboSetting) -> None:
-    data, count = encode_combo(setting)
+def set_modifier_key(profile: PfdProfile, button: int, usage: int) -> None:
+    """Assign Left Ctrl, Shift, Alt or Super on its own (stored as a one-modifier combination)."""
+    if usage not in MODIFIER_BITS:
+        raise ValueError("modifier key must be Left Ctrl, Shift, Alt, or Super")
+    set_combo(profile, button, ComboSetting((usage,), None), allow_lone_modifier=True)
+
+
+def set_combo(profile: PfdProfile, button: int, setting: ComboSetting, *,
+              allow_lone_modifier: bool = False) -> None:
+    data, count = encode_combo(setting, allow_lone_modifier=allow_lone_modifier)
     _set_field(profile, button, "ButtonFunc", str(FUNCTION_COMBO_KEY))
     _set_field(profile, button, "KeyNumber", str(count))
     current = _button_struct(profile, button)

@@ -96,4 +96,6 @@ def isolated_app_store(tmp_path, monkeypatch):
     # Never launch the real lighting writer either, even in tests that opt
     # back in to reading (launcher tests unset it and fake the process).
     monkeypatch.setenv("VENUS_PROFILE_NO_DEVICE_WRITE", "1")
+    # Never read or change the real desktop's mouse settings (tests inject fakes).
+    monkeypatch.setenv("VENUS_PROFILE_NO_DESKTOP_SETTINGS", "1")
     return store

@@ -31,6 +31,7 @@ from ..macro_library import MacroLibraryError
 from ..profile_session import DirtyProfileReplacementError, ProfileLoadError, ProfileSaveError
 from ..app_store import default_profile_library_dir
 from ..device_decode import decode_snapshot
+from ..desktop_settings import DesktopSettingsError, DesktopValues, detect_desktop
 from ..workspace import VenusWorkspace
 
 APPLICATION_ID = "io.github.berry_dingle.VenusMouse"
@@ -193,8 +194,13 @@ def log_mouse_write(kind: str, document: dict) -> None:
 class VenusWindow(Adw.ApplicationWindow):
     def __init__(self, application: Adw.Application, workspace: VenusWorkspace | None = None,
                  *, read_mouse_on_start: bool = False, snapshot_runner=None,
-                 event_watcher=None, lighting_writer=None) -> None:
+                 event_watcher=None, lighting_writer=None, desktop_settings="detect") -> None:
         super().__init__(application=application)
+        # Pointer speed / acceleration / double-click are the desktop's own
+        # settings (desktop_settings.py): None = not supported (rows hidden).
+        self._desktop = detect_desktop() if desktop_settings == "detect" else desktop_settings
+        self._desktop_values = DesktopValues()
+        self._apply_note = None
         # snapshot_runner(on_done) starts a read of the mouse and returns an
         # object with cancel(); the default launches the read-only helper.
         self._snapshot_runner = snapshot_runner or start_snapshot_read
@@ -246,6 +252,8 @@ class VenusWindow(Adw.ApplicationWindow):
         self.set_content(toolbar)
         self.connect("close-request", self._close_requested)
         self.workspace.subscribe(self._workspace_changed)
+        self._sync_desktop()                       # the desktop wins at start-up
+        self.connect("notify::is-active", self._activated)
         self._select_page("buttons")
         self.refresh_status()
         GLib.idle_add(self._report_startup)
@@ -438,20 +446,103 @@ class VenusWindow(Adw.ApplicationWindow):
             detail = f" ({message})" if message else ""
             self._show_banner(f"Live updates from the mouse stopped{detail}", "Read again", "retry")
 
+    # ------------------------------------------------------------ desktop settings
+    def _sync_desktop(self) -> None:
+        """Mirror the desktop: read its mouse settings into every profile (not an edit)."""
+        page = self.pages["settings"]
+        if self._desktop is None:
+            self._desktop_values = DesktopValues()
+            page.set_desktop(None, frozenset())
+            return
+        try:
+            values = self._desktop.read()
+        except Exception:                                   # the desktop could not be asked
+            values = DesktopValues()
+        self._desktop_values = values
+        page.set_desktop(self._desktop.name, values.available, self._desktop.scope_note)
+        self.workspace.adopt_desktop_settings(values)
+
+    def _activated(self, _window, _pspec) -> None:
+        # Back from System Settings: show what the desktop has now, unless edits wait for Apply.
+        if self.is_active() and self._desktop is not None and not self._desktop_changes():
+            self._sync_desktop()
+
+    def _desktop_changes(self) -> dict:
+        """What Apply would change on the desktop: the selected profile's values first, else
+        the first profile whose values differ from the desktop's (e.g. edited, then switched)."""
+        values = self._desktop_values
+        if not values.available:
+            return {}
+        slots = [self.workspace.selected_slot] + [slot for slot in range(1, 6)
+                                                  if slot != self.workspace.selected_slot]
+        for slot in slots:
+            try:
+                profile = self.workspace.profile(slot)
+            except Exception:
+                continue
+            changes = {}
+            if values.pointer_level is not None and profile.pointer_speed not in (None, values.pointer_level):
+                changes["pointer_level"] = profile.pointer_speed
+            if values.acceleration_on is not None and profile.acceleration is not None \
+                    and (profile.acceleration >= 2) != values.acceleration_on:
+                changes["acceleration_on"] = profile.acceleration >= 2
+            if values.double_click_level is not None \
+                    and profile.double_click_speed not in (None, values.double_click_level):
+                changes["double_click_level"] = profile.double_click_speed
+            if changes:
+                return changes
+        return {}
+
+    def _apply_desktop(self) -> bool | None:
+        """Write pending desktop changes: True done, None nothing to do, False refused (shown)."""
+        changes = self._desktop_changes()
+        if not changes:
+            return None
+        try:
+            self._desktop.write(**changes)
+        except (DesktopSettingsError, ValueError) as exc:
+            self._alert("Desktop settings were not changed", f"{exc}. Nothing was applied.")
+            self._sync_desktop_values_only()
+            return False
+        self._sync_desktop()                                # read back: the profiles take what it has now
+        return True
+
+    def _sync_desktop_values_only(self) -> None:
+        try:
+            self._desktop_values = self._desktop.read()
+        except Exception:
+            pass
+
     # ------------------------------------------------------------ Apply
     def _refresh_apply(self) -> None:
         """Apply commits edits: enabled when something would be sent or any profile shows edits."""
         live = self._live_lighting
         enabled = live.live and not live.applying and (live.has_pending_apply() or bool(self.workspace.edited_slots()))
+        enabled = enabled or (not live.applying and bool(self._desktop_changes()))
         self._actions["apply-to-mouse"].set_enabled(enabled)
 
     def _apply_to_mouse(self) -> None:
+        desktop = self._apply_desktop()
+        if desktop is False:                                # refused: send nothing, stay open
+            self._close_after_apply = False
+            self._refresh_apply()
+            return
         if not self._live_lighting.live:
+            # No mouse: only the desktop settings can be applied.
+            self._refresh_apply()
+            if desktop:
+                self.toast("Applied to your desktop settings")
+            if self._close_after_apply:
+                self._close_after_apply = False
+                self._close_now()
             return
         if self._live_lighting.apply():
+            self._apply_note = "Applied to the mouse and desktop" if desktop else None
             self._refresh_apply()                       # sending; _applied_to_mouse follows
         else:
-            self._applied_to_mouse()                    # nothing to send (e.g. PC-only settings): just commit
+            # Nothing to send to the mouse: just commit.
+            self._apply_note = "Applied to your desktop settings" if desktop else None
+            self._applied_to_mouse()
 
     def _live_buttons_sent(self, keys) -> None:
         """Buttons sent live (slot move or macro loop change): commit them, then refresh Apply.
@@ -465,7 +556,8 @@ class VenusWindow(Adw.ApplicationWindow):
     def _applied_to_mouse(self) -> None:
         self.workspace.mark_applied()                  # edited markers clear; Cancel returns here
         self._refresh_apply()
-        self.toast("Applied to the mouse")
+        note, self._apply_note = self._apply_note, None
+        self.toast(note or "Applied to the mouse")
         if self._close_after_apply:
             self._close_after_apply = False
             self._close_now()
@@ -649,7 +741,8 @@ class VenusWindow(Adw.ApplicationWindow):
             ("cancel", "Cancel", "win.cancel-edits",
              "Discard edits made since this profile was loaded"),
             ("apply", "Apply", "win.apply-to-mouse",
-             "Send DPI, polling, scroll and button changes to the mouse (all five profiles). "
+             "Send DPI, polling, scroll and button changes to the mouse (all five profiles), and "
+             "pointer speed, acceleration and double-click changes to your desktop settings. "
              "Lighting and the active profile are sent straight away."),
         ):
             button = Gtk.Button(label=label)
@@ -1087,7 +1180,7 @@ class VenusWindow(Adw.ApplicationWindow):
     # ------------------------------------------------------------ unapplied changes on close
     def _has_unapplied_changes(self) -> bool:
         """DPI, polling or button edits that differ from the mouse (lighting/profile are already on it)."""
-        return self._live_lighting.live and self._live_lighting.has_pending_apply()
+        return (self._live_lighting.live and self._live_lighting.has_pending_apply()) or bool(self._desktop_changes())
 
     def _ask_about_unapplied_changes(self) -> None:
         dialog = Adw.AlertDialog.new("Unsaved changes",
@@ -1110,9 +1203,7 @@ class VenusWindow(Adw.ApplicationWindow):
         self._unapplied_dialog = None
         if response == "apply":
             self._close_after_apply = True
-            if not self._live_lighting.apply():          # nothing left to send after all
-                self._close_after_apply = False
-                self._close_now()
+            self._apply_to_mouse()                       # closes when done (or stays open if refused)
         elif response == "save":
             self._close_after_save = True
             self._choose_save_as()

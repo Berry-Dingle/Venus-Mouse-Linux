@@ -17,8 +17,6 @@ from gi.repository import Gdk, GLib, Gtk
 
 from .accessibility import apply_accessible_label
 from ..pfd import (
-    ACCELERATION_MAX,
-    ACCELERATION_MIN,
     DOUBLE_CLICK_SPEED_MAX,
     DOUBLE_CLICK_SPEED_MIN,
     POINTER_SPEED_MAX,
@@ -71,12 +69,13 @@ MOUSE_ACCESS_COMMAND = "\n".join((
 ))
 
 
-# Shown on settings the Windows utility applies to the PC, not to the mouse:
-# Apply never writes them to device memory, and hid.exe imports
-# SystemParametersInfo/SetDoubleClickTime (investigation/READ_COVERAGE_AUDIT.md).
+# Settings the Windows utility applies to the PC, not to the mouse (hid.exe
+# 0x4109d0 SPI_SETMOUSE/SPI_SETMOUSESPEED, SetDoubleClickTime). Here they are the
+# desktop's own mouse settings (desktop_settings.py): shown as the desktop has
+# them, changed on Apply, hidden when the desktop has no such setting.
 PC_SETTING_TOOLTIP = (
-    "A PC setting: the Windows utility applies it to the computer's own pointer "
-    "settings. It is kept in the profile but never sent to the mouse."
+    "A desktop setting: it shows your desktop's current value and changes your "
+    "desktop's mouse settings when you press Apply. It is not sent to the mouse."
 )
 
 
@@ -91,7 +90,7 @@ class _SliderRow(Gtk.Box):
         header.append(label)
         self.pc_tag = None
         if pc_setting:
-            self.pc_tag = Gtk.Label(label="PC setting")
+            self.pc_tag = Gtk.Label(label="Desktop")
             self.pc_tag.add_css_class("settings-pc-tag")
             self.pc_tag.set_valign(Gtk.Align.CENTER)
             self.pc_tag.set_tooltip_text(PC_SETTING_TOOLTIP)
@@ -131,9 +130,11 @@ class SettingsPage(Gtk.Box):
         self._pointer = _SliderRow("Pointer speed", POINTER_SPEED_MIN, POINTER_SPEED_MAX,
                                    self._pointer_changed, ((1, "Slow"), (10, "Default"), (20, "Fast")),
                                    pc_setting=True)
-        self._acceleration = _SliderRow("Acceleration", ACCELERATION_MIN, ACCELERATION_MAX,
-                                        self._acceleration_changed, ((1, "1"), (2, "2"), (3, "3"), (4, "4")),
-                                        pc_setting=True)
+        # Two stops: Linux desktops have only flat (off) or adaptive (on) acceleration.
+        self._acceleration = _SliderRow("Acceleration", 0, 1, self._acceleration_changed,
+                                        ((0, "Off"), (1, "On")), pc_setting=True)
+        self._acceleration.scale.set_tooltip_text("Off: the pointer moves the same distance at any speed "
+                                                  "(flat). On: faster movements go further (adaptive).")
         self._scroll = _SliderRow("Scroll speed (lines per notch)", SCROLL_SPEED_MIN, SCROLL_SPEED_MAX,
                                   self._scroll_changed, ((1, "1"), (63, "63")))
         self._double_click = _SliderRow("Double-click speed", DOUBLE_CLICK_SPEED_MIN, DOUBLE_CLICK_SPEED_MAX,
@@ -141,15 +142,12 @@ class SettingsPage(Gtk.Box):
                                         pc_setting=True)
         for row in (self._pointer, self._acceleration, self._scroll, self._double_click):
             left.append(row)
-        note = Gtk.Label(
-            label=("Scroll speed is stored on the mouse. Settings marked PC setting are applied "
-                   "by the Windows utility to the computer itself; they are kept in the profile "
-                   "but not sent to the mouse."),
-            xalign=0, wrap=True,
-        )
+        note = Gtk.Label(xalign=0, wrap=True)
         note.add_css_class("dim-label")
         note.add_css_class("settings-note")
         left.append(note)
+        self._note = note
+        self.set_desktop(None, frozenset())
         self.append(left)
 
         right = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
@@ -216,6 +214,26 @@ class SettingsPage(Gtk.Box):
         right.append(device_card)
         self.append(right)
         self._refresh()
+
+    # ------------------------------------------------------------ desktop settings
+    def set_desktop(self, name: str | None, available, scope_note: str = "") -> None:
+        """Show only the desktop settings this desktop has (``desktop_settings`` names)."""
+        from ..desktop_settings import ACCELERATION, DOUBLE_CLICK, POINTER
+        rows = {POINTER: self._pointer, ACCELERATION: self._acceleration, DOUBLE_CLICK: self._double_click}
+        for key, row in rows.items():
+            row.set_visible(key in available)
+        text = "Scroll speed is stored on the mouse and sent on Apply."
+        if available:
+            text += (f" Settings marked Desktop are your {name} mouse settings: they show what the desktop "
+                     "has now and change it when you press Apply.")
+            if scope_note:
+                text += " " + scope_note
+        else:
+            text += (" Pointer speed, acceleration and double-click speed are desktop settings; "
+                     + (f"{name} doesn't offer them here" if name else "they are available on KDE Plasma "
+                        "(Wayland) and GNOME")
+                     + ", so they are hidden.")
+        self._note.set_text(text)
 
     # ------------------------------------------------------------ mouse access
     def _build_mouse_access(self) -> Gtk.Box:
@@ -308,7 +326,8 @@ class SettingsPage(Gtk.Box):
     def _acceleration_changed(self, _scale) -> None:
         if self._syncing:
             return
-        value = self._scale_value(self._acceleration)
+        from ..desktop_settings import acceleration_level_for
+        value = acceleration_level_for(self._scale_value(self._acceleration) == 1, self.profile.acceleration)
         if self.profile.acceleration_raw != value:
             self.profile.set_acceleration(value)
             self._edited()
@@ -347,8 +366,9 @@ class SettingsPage(Gtk.Box):
         try:
             self._sync_row(self._pointer, profile.pointer_speed_raw, profile.pointer_speed,
                            lambda value: str(value))
-            self._sync_row(self._acceleration, profile.acceleration_raw, profile.acceleration,
-                           lambda value: str(value))
+            level = profile.acceleration
+            self._acceleration.scale.set_value(1 if level and level >= 2 else 0)
+            self._acceleration.value_label.set_text("On" if level and level >= 2 else "Off")
             self._sync_row(self._scroll, profile.scroll_speed_raw, profile.scroll_speed,
                            lambda value: f"{value} line{'s' if value != 1 else ''}")
             self._sync_row(self._double_click, profile.double_click_speed_raw, profile.double_click_speed,

@@ -262,3 +262,15 @@ def test_scroll_lines_are_decoded_and_the_mouse_wins():
     workspace.apply_device_read(decode_memory(full))
     assert [workspace.profile(p).scroll_speed_raw for p in range(1, 6)] == [3, 1, 5, 1, 63]
 
+
+
+def test_a_lone_modifier_on_the_mouse_is_adopted():
+    values = factory_values()
+    address = 0x0082 + 4 * 8                                              # profile 1 button 9
+    for i, v in enumerate(bytes.fromhex("8F 02 00 00")):                  # Shift on its own
+        values[address + i] = v
+    workspace = _workspace()
+    report = workspace.apply_device_read(decode_memory(values))
+    view = bf.read_assignment(workspace.profile(1), 9)
+    assert view.combo.lone_modifier == 0xE1 and view.device_record == bytes.fromhex("8F 02 00 00")
+    assert not [n for n in report.notices if "8F 02" in n]

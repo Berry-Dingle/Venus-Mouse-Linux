@@ -1630,16 +1630,63 @@ def test_idle_reserved_scrollbars_are_marked_and_become_visible_when_scrolling()
         _pump_gtk()
 
 
+class _ConfirmingWindow:
+    """Stands in for VenusWindow._confirm: records the question, answers on demand."""
+
+    def __init__(self):
+        self.asked = []
+
+    def _confirm(self, heading, body, label, callback, *, destructive=True):
+        self.asked.append((heading, body, label, callback))
+
+
 @requires_gtk_display
-def test_deleting_a_macro_needs_no_confirmation():
-    """User decision 2026-11-19: Delete acts at once (the file goes to the trash)."""
+def test_deleting_a_macro_asks_first_and_cancel_keeps_it():
+    """User decision 2026-11-21: Delete asks for confirmation again (reverses 2026-11-19)."""
     window, page = _empty_selected_macro_page()
     try:
-        page._window = window                      # the in-app path that used to open a dialog
-        assert [entry.name for entry in page.workspace.library.entries] == ["Delays"]
+        asker = _ConfirmingWindow()
+        page._window = asker
         page._delete_library_button.emit("clicked")
         _pump_gtk()
+        assert [entry.name for entry in page.workspace.library.entries] == ["Delays"]   # nothing yet
+        assert len(asker.asked) == 1
+        heading, body, label, _callback = asker.asked[0]
+        assert "Delays" in heading and label == "Delete" and "trash" in body
+        # Cancel = the callback is never called: the macro stays.
+        assert [entry.name for entry in page.workspace.library.entries] == ["Delays"]
+    finally:
+        window.close()
+        _pump_gtk()
+
+
+@requires_gtk_display
+def test_confirming_macro_delete_deletes_it():
+    window, page = _empty_selected_macro_page()
+    try:
+        asker = _ConfirmingWindow()
+        page._window = asker
+        page._delete_library_button.emit("clicked")
+        asker.asked[0][3]()                         # the user pressed Delete
+        _pump_gtk()
         assert page.workspace.library.entries == []
+    finally:
+        window.close()
+        _pump_gtk()
+
+
+@requires_gtk_display
+def test_confirmed_delete_is_ignored_if_another_macro_was_selected_meanwhile():
+    window, page = _empty_selected_macro_page()
+    try:
+        asker = _ConfirmingWindow()
+        page._window = asker
+        page._delete_library_button.emit("clicked")
+        page.presentation.add_local_macro("Other")   # selection moves to the new macro
+        _pump_gtk()
+        asker.asked[0][3]()
+        _pump_gtk()
+        assert sorted(entry.name for entry in page.workspace.library.entries) == ["Delays", "Other"]
     finally:
         window.close()
         _pump_gtk()

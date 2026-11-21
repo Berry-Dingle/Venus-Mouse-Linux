@@ -1520,9 +1520,23 @@ class MacrosPage(Gtk.Box):
             self._report_error(str(exc))
 
     def _delete_macro(self, _button: Gtk.Button) -> None:
-        # No "are you sure?" dialog (user decision 2026-11-19): the macro file
-        # goes to the trash, so a deletion can be undone from there.
-        if self.presentation.selected_macro is None:
+        # Ask first (user decision 2026-11-21, reversing 2026-11-19: too easy to
+        # delete by mistake). The file still goes to the trash.
+        selected = self.presentation.selected_macro
+        if selected is None:
+            return
+        confirm = getattr(self._window, "_confirm", None)
+        if confirm is None:                      # no window to ask in (headless use)
+            self.presentation.delete_selected_macro()
+            return
+        macro_id = self.presentation.selected_macro_id
+        confirm(f"Delete “{selected.name}”?",
+                "The macro file is moved to the trash, where it can be restored.",
+                "Delete", lambda: self._delete_confirmed(macro_id))
+
+    def _delete_confirmed(self, macro_id) -> None:
+        # Only delete what was asked about, in case the selection changed meanwhile.
+        if macro_id is None or self.presentation.selected_macro_id != macro_id:
             return
         self.presentation.delete_selected_macro()
 

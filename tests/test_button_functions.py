@@ -188,3 +188,32 @@ def test_corrected_label_and_historical_alias():
     assert label_matches_record(raw, "Single Key A")
     assert not label_matches_record(bytes.fromhex("90 00 04 00"), "Single Key 1")
     assert HISTORICAL_ACTION_LABELS == {raw: ("Single Key A",)}
+
+
+@pytest.mark.parametrize("usage, record, label", [
+    (0xE0, "8F 01 00 00", "Key Left Ctrl"),
+    (0xE1, "8F 02 00 00", "Key Left Shift"),
+    (0xE2, "8F 04 00 00", "Key Left Alt"),
+    (0xE3, "8F 08 00 00", "Key Left Super"),
+])
+def test_a_modifier_on_its_own_is_a_one_modifier_combination(project_root, usage, record, label):
+    """Same shape as the captured modifier-only record 8F 0A 00 00 (Shift+Win)."""
+    profile = factory(project_root)
+    bf.set_modifier_key(profile, 9, usage)
+    view = bf.read_assignment(PfdProfile.from_bytes(profile.to_bytes()), 9)
+    assert view.function_code == bf.FUNCTION_COMBO_KEY
+    assert view.combo.lone_modifier == usage and view.key_number == 2
+    assert view.device_record == bytes.fromhex(record)
+    assert view.label == label
+    assert not [issue for issue in validate_pfd(profile) if issue.severity == "error"]
+
+
+def test_lone_modifier_needs_the_explicit_permission():
+    with pytest.raises(ValueError, match="at least two keys"):
+        bf.encode_combo(bf.ComboSetting((0xE1,), None))         # the Combo editor still needs two
+    with pytest.raises(ValueError):
+        bf.encode_combo(bf.ComboSetting((), 0x04), allow_lone_modifier=True)   # a plain key is Single Key
+    with pytest.raises(ValueError):
+        bf.set_modifier_key(None, 9, 0xE5)                      # right-hand: the caller maps to left
+    with pytest.raises(ValueError):
+        bf.set_modifier_key(None, 9, 0x04)

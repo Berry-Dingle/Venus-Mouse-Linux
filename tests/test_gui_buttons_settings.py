@@ -257,8 +257,11 @@ def test_settings_marks_pc_only_pointer_settings():
     tagged = {row: row.pc_tag is not None for row in (page._pointer, page._acceleration, page._scroll, page._double_click)}
     assert tagged[page._pointer] and tagged[page._acceleration] and tagged[page._double_click]
     assert tagged[page._scroll] is False  # scroll speed is written to the mouse (0x0020)
-    assert page._pointer.pc_tag.get_label() == "PC setting"
-    assert "never sent to the mouse" in page._pointer.pc_tag.get_tooltip_text()
+    assert page._pointer.pc_tag.get_label() == "Desktop"
+    assert "not sent to the mouse" in page._pointer.pc_tag.get_tooltip_text()
+    # No desktop support (tests switch it off): the three desktop rows are hidden.
+    assert not any(row.get_visible() for row in (page._pointer, page._acceleration, page._double_click))
+    assert page._scroll.get_visible()
 
 
 def test_viewing_a_factory_zero_ms_fire_key_changes_nothing():
@@ -270,3 +273,63 @@ def test_viewing_a_factory_zero_ms_fire_key_changes_nothing():
     panel = _select(page, 4)
     assert panel._fire_delay.get_value() == 20
     assert workspace.profile(1).to_bytes() == before and workspace.edited_slots() == edited
+
+
+# GDK hardware keycodes are evdev codes + 8.
+_SHIFT_L, _SHIFT_R, _CTRL_L, _ALT_L, _TAB = 42 + 8, 54 + 8, 29 + 8, 56 + 8, 15 + 8
+
+
+def _press(entry, keycode, keyval=0, state=0, release=True):
+    from gi.repository import Gdk
+    handled = entry._key_pressed(None, keyval, keycode, Gdk.ModifierType(state))
+    if release:
+        entry._key_released(None, keyval, keycode, Gdk.ModifierType(0))
+    return handled
+
+
+@pytest.mark.parametrize("keycode, usage, record", [
+    (_SHIFT_L, 0xE1, "8F 02 00 00"), (_SHIFT_R, 0xE1, "8F 02 00 00"),
+    (_CTRL_L, 0xE0, "8F 01 00 00"), (_ALT_L, 0xE2, "8F 04 00 00"),
+])
+def test_shift_ctrl_alt_can_be_assigned_as_a_keyboard_key(keycode, usage, record):
+    page, workspace = _page()
+    panel = _select(page, 8)
+    _choose(panel, bf.Category.KEYBOARD)
+    assert _press(panel._key_entry, keycode) is True
+    view = bf.read_assignment(workspace.profile(1), 8)
+    assert view.device_record == bytes.fromhex(record)
+    # Shown back as a keyboard key, not as a combination.
+    assert panel._category.get_selected() == CATEGORIES.index(bf.Category.KEYBOARD)
+    assert panel._key_entry.usage == usage and panel._key_entry.get_visible()
+    assert panel._current.get_text() == view.label == f"Key {panel._key_entry.get_text()}"
+
+
+def test_tab_is_captured_and_ctrl_tab_still_moves_focus():
+    from gi.repository import Gdk
+    page, workspace = _page()
+    panel = _select(page, 8)
+    _choose(panel, bf.Category.KEYBOARD)
+    assert _press(panel._key_entry, _TAB, Gdk.KEY_Tab) is True
+    assert bf.read_assignment(workspace.profile(1), 8).device_record == bytes.fromhex("90 00 2B 00")
+    # Ctrl+Tab: Ctrl goes down, Tab is left to GTK, Ctrl comes up: nothing is assigned.
+    entry = panel._key_entry
+    assert _press(entry, _CTRL_L, release=False) is True
+    assert _press(entry, _TAB, Gdk.KEY_Tab, Gdk.ModifierType.CONTROL_MASK, release=False) is False
+    entry._key_released(None, 0, _TAB, Gdk.ModifierType.CONTROL_MASK)
+    entry._key_released(None, 0, _CTRL_L, Gdk.ModifierType(0))
+    assert bf.read_assignment(workspace.profile(1), 8).device_record == bytes.fromhex("90 00 2B 00")
+
+
+def test_combo_and_fire_key_fields_still_refuse_a_lone_modifier():
+    page, workspace = _page()
+    panel = _select(page, 8)
+    before = workspace.profile(1).to_bytes()
+    _choose(panel, bf.Category.COMBO)
+    _press(panel._combo_key, _SHIFT_L)
+    assert panel._combo_key.usage is None
+    panel._modifier_buttons[0xE1].set_active(True)          # Shift alone in the Combo editor: incomplete
+    assert workspace.profile(1).to_bytes() == before
+    assert panel._category.get_selected() == CATEGORIES.index(bf.Category.COMBO)
+    _choose(panel, bf.Category.FIRE)
+    _press(panel._fire_key, _SHIFT_L)
+    assert panel._fire_key.usage is None

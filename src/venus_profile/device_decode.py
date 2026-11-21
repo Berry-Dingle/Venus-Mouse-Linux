@@ -319,7 +319,7 @@ def _apply_button(profile, number: int, button: int, record: bytes, slot_names: 
         modifiers = tuple(_MODIFIER_FROM_BIT[bit] for bit in (0x01, 0x02, 0x04, 0x08) if record[1] & bit)
         try:
             encoded = bf.ComboSetting(modifiers, record[2] or None)
-            bf.set_combo(profile, button, encoded)
+            bf.set_combo(profile, button, encoded, allow_lone_modifier=True)   # 8F 02 00 00 = Shift
         except ValueError:
             pass
         else:

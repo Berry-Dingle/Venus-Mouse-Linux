@@ -23,6 +23,11 @@ FIRE_TRIGGERS = (
 
 
 SLOT_PLACEHOLDER = "Choose a slot…"
+TAB_USAGE = 0x2B
+#: Right-hand modifiers are stored as their left-hand twin: the Windows editor
+#: only uses the left ones and the device mask has bits for Ctrl/Shift/Alt/Super.
+LEFT_MODIFIER = {0xE0: 0xE0, 0xE1: 0xE1, 0xE2: 0xE2, 0xE3: 0xE3,
+                 0xE4: 0xE0, 0xE5: 0xE1, 0xE6: 0xE2, 0xE7: 0xE3}
 
 
 def _typed_value(spin: Gtk.SpinButton) -> int:
@@ -49,10 +54,12 @@ class KeyEntry(Gtk.Entry):
         super().__init__(placeholder_text=placeholder)
         self.usage: int | None = None
         self._allow_modifiers = allow_modifiers
+        self._pending_modifier: int | None = None    # a modifier pressed with nothing else (yet)
         self._on_change = None
         keys = Gtk.EventControllerKey()
         keys.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
         keys.connect("key-pressed", self._key_pressed)
+        keys.connect("key-released", self._key_released)
         self.add_controller(keys)
         self.connect("changed", self._text_changed)
         # A typed key name applies on Enter or when focus leaves the field.
@@ -60,7 +67,10 @@ class KeyEntry(Gtk.Entry):
         focus = Gtk.EventControllerFocus()
         focus.connect("leave", lambda _controller: self._commit_typed())
         self.add_controller(focus)
-        self.set_tooltip_text("Press the key to assign, or type its name (for example F, Space, F5, Keypad +)")
+        tip = "Press the key to assign, or type its name (for example F, Space, Tab, F5, Keypad +)"
+        if allow_modifiers:
+            tip += ". Shift, Ctrl, Alt and Super assign when pressed and released on their own"
+        self.set_tooltip_text(tip + ". Ctrl+Tab moves to the next field.")
 
     def connect_change(self, callback) -> None:
         self._on_change = callback
@@ -70,19 +80,31 @@ class KeyEntry(Gtk.Entry):
         self.set_text(key_name(usage) if usage else "")
         self.remove_css_class("error")
 
-    def _key_pressed(self, _controller, keyval, keycode, _state) -> bool:
-        if keyval in (Gdk.KEY_Tab, Gdk.KEY_ISO_Left_Tab):
-            return False
+    def _key_pressed(self, _controller, keyval, keycode, state) -> bool:
         usage = usage_from_gdk_keycode(keycode)
+        if usage in MODIFIER_USAGES:
+            # Wait for the release: Ctrl+Tab (move focus) must not assign Ctrl.
+            self._pending_modifier = usage if self._allow_modifiers else None
+            return True
+        self._pending_modifier = None
+        if keyval in (Gdk.KEY_Tab, Gdk.KEY_ISO_Left_Tab) and state & Gdk.ModifierType.CONTROL_MASK:
+            return False                                 # Ctrl+Tab: let GTK move the focus on
         if usage is None:
             return False
-        if usage in MODIFIER_USAGES and not self._allow_modifiers:
-            return True
+        self._capture(usage)
+        return True
+
+    def _key_released(self, _controller, _keyval, keycode, _state) -> None:
+        usage = usage_from_gdk_keycode(keycode)
+        pending, self._pending_modifier = self._pending_modifier, None
+        if pending is not None and usage == pending:
+            self._capture(pending)
+
+    def _capture(self, usage: int) -> None:
         self.set_usage(usage)
         self.set_position(-1)
         if self._on_change:
             self._on_change()
-        return True
 
     def _commit_typed(self) -> None:
         if self.usage is not None and self._on_change:
@@ -153,7 +175,7 @@ class AssignmentPanel(Gtk.Box):
         self._function.connect("notify::selected", self._function_changed)
         change_card.append(self._function)
 
-        self._key_entry = KeyEntry("Press a key…")
+        self._key_entry = KeyEntry("Press a key…", allow_modifiers=True)
         apply_accessible_label(self._key_entry, "Key to assign")
         self._key_entry.connect_change(self._apply_choice)
         change_card.append(self._key_entry)
@@ -396,6 +418,9 @@ class AssignmentPanel(Gtk.Box):
             usage = self._key_entry.usage
             if usage is None:
                 raise IncompleteChoice("Press or type the key to assign.")
+            if usage in MODIFIER_USAGES:                 # Shift/Ctrl/Alt/Super on their own
+                modifier = LEFT_MODIFIER[usage]
+                return lambda target: bf.set_modifier_key(target, button, modifier)
             return lambda target: bf.set_single_key(target, button, usage)
         if category is bf.Category.COMBO:
             modifiers = tuple(usage for usage, toggle in self._modifier_buttons.items() if toggle.get_active())
@@ -463,10 +488,16 @@ class AssignmentPanel(Gtk.Box):
         try:
             self._refresh_macro_slots()
             category = view.category or bf.Category.MOUSE
+            lone_modifier = view.combo.lone_modifier if view.combo else None
+            if lone_modifier is not None:
+                category = bf.Category.KEYBOARD          # a bare Shift etc. is shown as a keyboard key
             self._category.set_selected(CATEGORIES.index(category))
-            self._set_function_choices(category, view.function_code)
-            self._key_entry.set_usage(view.single_key if view.function_code == bf.FUNCTION_SINGLE_KEY else None)
-            combo = view.combo
+            self._set_function_choices(category, None if lone_modifier else view.function_code)
+            if lone_modifier is not None:
+                self._key_entry.set_usage(lone_modifier)
+            else:
+                self._key_entry.set_usage(view.single_key if view.function_code == bf.FUNCTION_SINGLE_KEY else None)
+            combo = None if lone_modifier is not None else view.combo
             for usage, toggle in self._modifier_buttons.items():
                 toggle.set_active(bool(combo and usage in combo.modifiers))
             self._combo_key.set_usage(combo.key if combo else None)

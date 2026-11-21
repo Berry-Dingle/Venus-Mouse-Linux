@@ -400,6 +400,46 @@ class VenusWorkspace:
         self.notify("lighting-committed")
         return True
 
+    def adopt_desktop_settings(self, values) -> bool:
+        """The desktop wins: copy its pointer speed / acceleration / double-click into every profile.
+
+        ``values`` is a ``desktop_settings.DesktopValues``; unavailable (None)
+        settings are left alone.  Each slot's Cancel baseline takes the same
+        values, so this is never counted as an edit and other edits are kept.
+        Returns True if any profile changed.
+        """
+        from .desktop_settings import acceleration_level_for
+
+        def adopt(profile: PfdProfile) -> None:
+            if values.pointer_level is not None and profile.pointer_speed_raw != values.pointer_level:
+                profile.set_pointer_speed(values.pointer_level)
+            if values.acceleration_on is not None:
+                level = acceleration_level_for(values.acceleration_on, profile.acceleration)
+                if profile.acceleration_raw != level:
+                    profile.set_acceleration(level)
+            if values.double_click_level is not None and \
+                    profile.double_click_speed_raw != values.double_click_level:
+                profile.set_double_click_speed(values.double_click_level)
+
+        changed = False
+        for slot in SLOTS:
+            session = self.profiles.session_for_slot(slot)
+            if session is None:
+                continue
+            before = session.profile.to_bytes()
+            adopt(session.profile)
+            loaded = self._loaded.get(slot)
+            if loaded is not None:
+                baseline = PfdProfile.from_bytes(loaded)
+                adopt(baseline)
+                self._loaded[slot] = baseline.to_bytes()
+                if self.session(slot).profile.to_bytes() == self._loaded[slot]:
+                    self._loaded[slot] = session.profile.to_bytes()   # identical: keep exact bytes
+            changed |= session.profile.to_bytes() != before
+        if changed:
+            self.notify("desktop-settings")
+        return changed
+
     def mark_applied(self) -> None:
         """Apply succeeded: every slot's Cancel baseline becomes its current state.
 
