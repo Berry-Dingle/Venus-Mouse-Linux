@@ -100,6 +100,34 @@ def test_macro_button_records_use_bank_loop_settings(workspace, project_root):
     assert workspace.library.slot_macro(0) is None
 
 
+@pytest.mark.parametrize("loop_type, loop_time, expected", [
+    (0, 3, (0x00, 3)),            # fixed: count = LoopTime
+    (0, 255, (0x00, 255)),
+    (1, 4, (0x80, 4)),            # while held: 0x80, count = LoopTime
+    (2, 9, (0x00, 1)),            # run once: count forced to 1
+    (3, 1, (0x40, 0xFFFF)),       # toggle: 0x40, count forced to 0xFFFF (hid.exe 0x41317F-0x41318D)
+    (3, 10, (0x40, 0xFFFF)),      # live: toggle with count 10 played 10 times instead of toggling
+])
+def test_macro_loop_matches_the_windows_compiler(workspace, loop_type, loop_time, expected):
+    from venus_profile.macro_library import set_loop
+    entry = workspace.library.create("Loop probe")
+    set_loop(entry.macro, loop_type, loop_time)
+    assert apply_plan._macro_loop(entry) == expected
+
+
+def test_toggle_record_matches_the_one_read_from_the_mouse(workspace, project_root):
+    """Saved read 20261119T214209: P1 button 7 holds 91 44 ff ff (toggle, slot 5)."""
+    from venus_profile.lighting_preview_plan import button_record_address
+    read = project_root / "usb-captures" / "live-reads" / "venus_read_20261119T214209.289848Z" / "live_memory.bin"
+    address = button_record_address(1, 7)
+    assert read.read_bytes()[address:address + 4] == bytes.fromhex("9144ffff")
+    from venus_profile.macro_library import set_loop
+    entry = workspace.library.create("Toggle probe")
+    set_loop(entry.macro, 3, 1)
+    flags, count = apply_plan._macro_loop(entry)
+    assert bytes((0x91, 4 | flags, count & 0xFF, count >> 8)) == bytes.fromhex("9144ffff")
+
+
 def test_preview_module_has_no_transport_surface():
     import ast
     import inspect

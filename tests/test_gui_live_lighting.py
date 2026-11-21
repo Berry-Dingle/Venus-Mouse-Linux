@@ -968,7 +968,8 @@ def _edit_loop(window, entry, loop_type, loop_time=None):
 
 
 @pytest.mark.parametrize("loop_type, loop_time, record", [
-    (3, None, "914a0100"),        # toggle: flag 0x40 | slot 10, count = LoopTime (1)
+    (3, None, "914affff"),        # toggle: flag 0x40 | slot 10, count 0xFFFF (hid.exe 0x41317F)
+    (3, 7, "914affff"),           # toggle ignores the fixed repeat count
     (1, None, "918a0100"),        # while held: flag 0x80
     (0, 5, "910a0500"),           # fixed: count 5
 ])

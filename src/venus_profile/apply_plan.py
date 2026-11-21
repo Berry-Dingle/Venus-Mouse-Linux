@@ -139,14 +139,26 @@ def _dpi_writes(profile, number: int) -> list[PlannedWrite]:
     return writes
 
 
+#: Count Windows sends for a toggle macro (hid.exe 0x413184-0x41318D).
+TOGGLE_COUNT = 0xFFFF
+
+
 def _macro_loop(entry) -> tuple[int, int]:
-    """Return (flags, execution count) as compiled by hid.exe 0x412F10."""
+    """Return (flags, execution count) as compiled by hid.exe 0x412F10.
+
+    LoopType 1 (while held) sets 0x80, LoopType 3 (toggle) sets 0x40. The count
+    is LoopTime (0 -> 1), run once forces 1, and toggle overwrites it with
+    0xFFFF (0x41317F-0x41318D: ``cmp eax,3`` then ``mov al,0xff`` into both
+    count bytes). Live-confirmed: toggle with count 10 plays 10 times and stops.
+    """
     macro = entry.macro
     loop_type = macro.loop_type
     flags = 0x80 if loop_type == 1 else (0x40 if loop_type == 3 else 0)
     count = macro.loop_time or 1
     if loop_type == 2:
         count = 1
+    if loop_type == 3:
+        count = TOGGLE_COUNT
     return flags, count
 
 
