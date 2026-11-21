@@ -8,7 +8,7 @@
 # mouse once after installing.
 
 pkgname=venus-mouse
-pkgver=0.2.1
+pkgver=0.2.2
 pkgrel=1
 pkgdesc="Configure buttons, DPI, lighting and macros for the UtechSmart Venus MMO mouse"
 arch=('any')

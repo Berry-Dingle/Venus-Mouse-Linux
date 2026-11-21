@@ -43,7 +43,7 @@ not needed on a desktop.
 ## Install / remove (user-run)
 
 ```bash
-sudo dnf install ./build/rpm/venus-mouse-0.2.1-1.noarch.rpm
+sudo dnf install ./build/rpm/venus-mouse-0.2.2-1.noarch.rpm
 sudo dnf remove venus-mouse
 ```
 
